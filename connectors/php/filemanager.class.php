@@ -387,9 +387,10 @@ class Filemanager {
 
 		}
 		$newdir = $this->cleanString($this->get['name']);
-		if(!mkdir($current_path . $newdir,0755)) {
+		if(!mkdir($current_path . $newdir)) {
 			$this->error(sprintf($this->lang('UNABLE_TO_CREATE_DIRECTORY'),$newdir));
 		}
+		chmod($current_path . $newdir, 0755);
 		$array = array(
 				'Parent'=>$this->get['path'],
 				'Name'=>$this->get['name'],
