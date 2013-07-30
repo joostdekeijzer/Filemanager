@@ -24,9 +24,13 @@ require_once('filemanager.class.php');
  *	@return boolean true is access granted, false if no access
  */
 function auth() {
-  // You can insert your own code over here to check if the user is authorized.
-  // If you use a session variable, you've got to start the session first (session_start())
-  return true;
+  session_name('CAKEPHP');
+  session_start();
+  if( isset($_SESSION['Auth']['User']) ) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 
