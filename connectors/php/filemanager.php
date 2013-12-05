@@ -17,7 +17,6 @@
 require_once('./inc/filemanager.inc.php');
 require_once('filemanager.class.php');
 
-
 /**
  *	Check if user is authorized
  *
@@ -87,6 +86,13 @@ if(!isset($_GET)) {
         }
         break;
 
+      case 'move':
+        // allow "../"
+        if($fm->getvar('old') && $fm->getvar('new', 'parent_dir') && $fm->getvar('root')) {
+          $response = $fm->move();
+        }
+        break;
+
       case 'delete':
 
         if($fm->getvar('path')) {
@@ -109,7 +115,12 @@ if(!isset($_GET)) {
         
       case 'preview':
         if($fm->getvar('path')) {
-          $fm->preview();
+        	if(isset($_GET['thumbnail'])) {
+        		$thumbnail = true;
+        	} else {
+        		$thumbnail = false;
+        	}
+          $fm->preview($thumbnail);
         }
         break;
 			

@@ -32,11 +32,15 @@ video, audio {
 #uploader h1 {
 	display: block;
 	float: left;
-	text-align: left;
+	margin-left:1em;
 	line-height:1.9em;
 	font-size: 0.8em;
 	text-shadow:1px 1px 0px #ffffff;
 	word-break: break-all;
+}
+
+button#home {
+	float:left;
 }
 
 #uploadresponse {
@@ -167,33 +171,28 @@ button span {
 
 button:active,
 button:focus {
-	font-weight: bold;
+	color:#000;
 	outline-color: transparent;
 	outline-style: none;
 	outline-width: 0;
 }
 
 /** Input file Replacement */
+
+
+input, button {
+  vertical-align: text-top;
+}
+
 #file-input-container {
-	display:inline-block;
+	display:inline;
 	margin:0;
 	position:relative;
-	top:0px;
-	width:215px;
+	top:0;
+	width:255px;
 	height:32px;
 	overflow: hidden;
 }
-
-/** Firefox hack */
-@-moz-document url-prefix() {
-	#file-input-container  {
-		top:11px;
-		width:255px;
-	}
-}
-
-/** Opera hack */
-x:-o-prefocus, #file-input-container {top:16px;width:205px;}
 
 #newfile {
 	position: absolute;
@@ -208,6 +207,7 @@ x:-o-prefocus, #file-input-container {top:16px;width:205px;}
 #alt-fileinput {
 	display: inline;
 	wrap: no-wrap;
+	
 }
 
 #filepath {
@@ -216,6 +216,7 @@ x:-o-prefocus, #file-input-container {top:16px;width:205px;}
 	margin: 0;
 	padding: 0.1em 0.3em;
 	line-height: 1.7em;
+	height:100%;
 	-webkit-border-top-left-radius: 6px;
 	-webkit-border-bottom-left-radius: 6px;
 	-moz-border-radius-topleft: 6px;
@@ -229,6 +230,8 @@ x:-o-prefocus, #file-input-container {top:16px;width:205px;}
 		padding:0.2em 0.3em;
 	}
 }
+
+
 button#browse {
 	margin-left:0;
 	-webkit-border-top-left-radius: 0px;
@@ -266,6 +269,7 @@ button#browse span {
 	font-size: 0.85em;
 	position: relative;
 	left: -200px;
+	top: 8px;
 }
 
 #search a.q-reset {
@@ -276,7 +280,7 @@ button#browse span {
 	position: relative;
 	opacity:0.5;
 	left: -30px;
-	top: 5px;
+	top: 13px;
 	z-index: 24;
 }
 
@@ -420,6 +424,7 @@ div.clip {
 #select span, .contextMenu li.select a { background-image: url(../images/accept.png); }
 #download span, .contextMenu li.download a { background-image: url(../images/download.png); }
 #rename span, .contextMenu li.rename a { background-image: url(../images/pencil.png); }
+#move span, .contextMenu li.move a { background-image: url(../images/move.png); }
 #delete span, .contextMenu li.delete a { background-image: url(../images/bin_closed.png); }
 #upload span { background-image: url(../images/upload.png); }
 #upload span.loading { background-image: url(../images/ajax-loader.gif);color:#555555;font-size:0.9em; }
@@ -496,4 +501,24 @@ button.ON {
 	display:inline-table;
 	width:30px;
 	height:30px;
+}
+
+/* IE10-11 styles */
+html[data-useragent*='MSIE 10.0'] #uploader button,
+html[data-useragent*='MSIE 11.0'] #uploader button {
+	vertical-align: top;
+}
+html[data-useragent*='MSIE 10.0'] #file-input-container,
+html[data-useragent*='MSIE 11.0'] #file-input-container {
+ 	width: 220px;
+ 	height: 32px;
+ 	overflow: hidden;
+}
+html[data-useragent*='MSIE 10.0'] #filepath,
+html[data-useragent*='MSIE 11.0'] #filepath {
+	height: 22px;
+}
+html[data-useragent*='MSIE 10.0'] #newfile,
+html[data-useragent*='MSIE 11.0'] #newfile {
+	height: 23px;
 }

@@ -4,6 +4,7 @@ use JSON;
 use Image::Info qw( image_info image_type);
 use File::Basename;
 use File::Find::Rule;
+use File::Slurp;
 use strict;
 
 our $q;
@@ -11,6 +12,7 @@ our $q;
 #Edit this with your values in
 require 'filemanager_config.pl';
 my $config = $Filemanager::Config::config;
+my $config_js = from_json(read_file( '../../scripts/filemanager.config.js', binmode => ':utf8' ), {utf8 => 1}) ;
 
 my $MODE_MAPPING = {
   '' => \&root,
@@ -51,18 +53,24 @@ sub file_info {
   my $info = image_info($abs_filename);
   my ($fileparse_filename, $fileparse_dirs, $fileparse_suffix) = fileparse($abs_filename);
   $fileparse_filename =~ /\.(.+)/;
-  my $suffix = $1 || "";
+  my $suffix = lc($1) || "";
 
   my $directory = -d $abs_filename;
   if($directory) {
     $url_filename .= "/";
   }
 
+  my $preview = $config_js->{icons}{path}.(($directory)?$config_js->{icons}{directory}:$config_js->{icons}{default}); 
+  if (grep{$suffix eq $_}@{$config_js->{images}->{imagesExt}}){
+    $preview = $url_filename;
+  } elsif (-e '../../'.$config_js->{icons}{path}.$suffix.'.png'){
+    $preview = $config_js->{icons}{path}.$suffix.'.png';
+  };
   return {
     "Path" => $url_filename,
     "Filename" => $fileparse_filename,
     "File Type" => $directory ? "dir" : $suffix,
-    "Preview" => $directory ? "images\/fileicons\/_Open.png" : $url_filename,
+    "Preview" => $preview,
     "Properties" => {
       "Date Created" => '', #TODO
       "Date Modified" => '', #"02/09/2007 14:01:06", 
@@ -78,7 +86,7 @@ sub file_info {
 # ?mode=getfolder&path=/UserFiles/Image/&getsizes=true&type=images
 #Ignoring type for now
 sub getfolder {
-  return unless params_valid([qw(path type)]);
+  return unless params_valid([qw(path)]);
 
   my @directory_list = ();
 
@@ -109,20 +117,24 @@ sub getfolder {
 # ?mode=rename&old=/UserFiles/Image/logo.png&new=id.png
 sub rename {
   return unless params_valid([qw(old new)]);
+  my $path = '';
+  my $old_name = '';
+  my $error = 0;
   my $full_old = absolute_file_name_from_url($q->param('old'));
-  my $full_new = absolute_file_name_from_url($q->param('new'));
+  ($path, $old_name) = ($1, $2) if $full_old =~ m|^ ( (?: .* / (?: \.\.?\z )? )? ) ([^/]*) |xs;
+  my $new_name = $q->param('new');
+  $new_name =~ s|^ .* / (?: \.\.?\z )? ||xs;
+  $error = 1 if $new_name =~ /^\.?\.?\z/;
+  my $full_new = remove_extra_slashes("$path/$new_name");
 
-  my $old_name = fileparse($full_old);
-  my $new_name = fileparse($full_new);
-
-  my $success = rename $full_old, $full_new;
+  $error ||= (rename($full_old, $full_new))?0:1;
 
   print_json({
-    "Error" => $success ? "No error" : "Could not rename",
-    "Code" => !$success,
-    "Old Path" => $q->param('old'),
+    "Error" => $error ? "Could not rename" : "No error",
+    "Code" => $error,
+    "Old Path" => url_for_relative_filename(relative_file_name_from_absolute($full_old)),
     "Old Name" => $old_name,
-    "New Path" => $q->param('new'), 
+    "New Path" => url_for_relative_filename(relative_file_name_from_absolute($full_new)),
     "New Name" => $new_name
   });
 }

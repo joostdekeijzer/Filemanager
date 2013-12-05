@@ -25,6 +25,10 @@ class Filemanager {
 	protected $dynamic_fileroot = '';
 	protected $logger = false;
 	protected $logfile = '/tmp/filemanager.log';
+	protected $cachefolder = '_thumbs/';
+	protected $thumbnail_width = 64;
+	protected $thumbnail_height = 64;
+	protected $separator = 'userfiles'; // @todo fix keep it or not?
 
 	public function __construct($extraConfig = '') {
 			
@@ -61,14 +65,17 @@ class Filemanager {
 		if ($this->config['options']['fileRoot'] !== false ) {
 			if($this->config['options']['serverRoot'] === true) {
 				$this->doc_root = $_SERVER['DOCUMENT_ROOT'];
+				$this->separator = basename($this->config['options']['fileRoot']);
 			} else {
 				$this->doc_root = $this->config['options']['fileRoot'];
+				$this->separator = basename($this->config['options']['fileRoot']);
 			}
 		} else {
 			$this->doc_root = $_SERVER['DOCUMENT_ROOT'];
 		}
 
 		$this->__log(__METHOD__ . ' $this->doc_root value ' . $this->doc_root);
+		$this->__log(__METHOD__ . ' $this->separator value ' . $this->separator);
 
 		$this->setParams();
 		$this->availableLanguages();
@@ -93,9 +100,11 @@ class Filemanager {
 		
 		// necessary for retrieving path when set dynamically with $fm->setFileRoot() method
 		$this->dynamic_fileroot = str_replace($_SERVER['DOCUMENT_ROOT'], '', $this->doc_root);
+		$this->separator = basename($this->doc_root);
 		
 		$this->__log(__METHOD__ . ' $this->doc_root value overwritten : ' . $this->doc_root);
 		$this->__log(__METHOD__ . ' $this->dynamic_fileroot value ' . $this->dynamic_fileroot);
+		$this->__log(__METHOD__ . ' $this->separator value ' . $this->separator);
 	}
 
 	public function error($string,$textarea=false) {
@@ -123,11 +132,11 @@ class Filemanager {
 		}
 	}
 
-	public function getvar($var) {
+	public function getvar($var, $preserve = null) {
 		if(!isset($_GET[$var]) || $_GET[$var]=='') {
 			$this->error(sprintf($this->lang('INVALID_VAR'),$var));
 		} else {
-			$this->get[$var] = $this->sanitize($_GET[$var]);
+			$this->get[$var] = $this->sanitize($_GET[$var], $preserve);
 			return true;
 		}
 	}
@@ -143,7 +152,7 @@ class Filemanager {
 	public function getinfo() {
 		$this->item = array();
 		$this->item['properties'] = $this->properties;
-		$this->get_file_info();
+		$this->get_file_info('', false);
 		
 		// handle path when set dynamically with $fm->setFileRoot() method
 		if($this->dynamic_fileroot != '') {
@@ -218,7 +227,7 @@ class Filemanager {
 				} else if (!in_array($file, $this->config['exclude']['unallowed_files'])  && !preg_match( $this->config['exclude']['unallowed_files_REGEXP'], $file)) {
 					$this->item = array();
 					$this->item['properties'] = $this->properties;
-					$this->get_file_info($this->get['path'] . $file);
+					$this->get_file_info($this->get['path'] . $file, true);
 
 					if(!isset($this->params['type']) || (isset($this->params['type']) && strtolower($this->params['type'])=='images' && in_array(strtolower($this->item['filetype']),$this->config['images']['imagesExt']))) {
 						if($this->config['upload']['imagesOnly']== false || ($this->config['upload']['imagesOnly']== true && in_array(strtolower($this->item['filetype']),$this->config['images']['imagesExt']))) {
@@ -291,6 +300,77 @@ class Filemanager {
 		return $array;
 	}
 
+	public function move() {
+
+		$rootDir = $this->get['root'];
+		$oldPath = $this->getFullPath($this->get['old']);
+
+        // old path
+        $tmp = explode('/',trim($this->get['old'], '/'));
+        $fileName = array_pop($tmp); // file name or new dir name
+        $path = '/' . implode('/', $tmp) . '/';
+
+		// new path
+		if (substr($this->get['new'], 0, 1) != "/") {
+			// make path relative from old dir
+			$newPath = $path . '/' . $this->get['new'] . '/';
+		} else {
+			$newPath = $rootDir . '/' . $this->get['new'] . '/';
+		}
+
+		$newPath = preg_replace('#/+#', '/', $newPath);
+		$newPath = $this->expandPath($newPath, true);
+
+		//!important! check that we are stil under ROOT dir
+		if (strncasecmp($newPath, $rootDir, strlen($rootDir))) {
+			$this->error(sprintf($this->lang('INVALID_DIRECTORY_OR_FILE'),$this->get['new']));
+		}
+
+		if(!$this->isValidPath($oldPath)) {
+			$this->error("No way.");
+		}
+
+        $newRelativePath = $newPath;
+		$newPath = $this->getFullPath($newPath);
+
+		// check if file already exists
+		if (file_exists($newPath.$fileName)) {
+			if(is_dir($newPath.$fileName)) {
+				$this->error(sprintf($this->lang('DIRECTORY_ALREADY_EXISTS'),rtrim($this->get['new'], '/').'/'.$fileName));
+			} else {
+				$this->error(sprintf($this->lang('FILE_ALREADY_EXISTS'),rtrim($this->get['new'], '/').'/'.$fileName));
+			}
+		}
+
+		// create dir if not exists
+		if (!file_exists($newPath)) {
+			if(!mkdir($newPath,0755, true)) {
+				$this->error(sprintf($this->lang('UNABLE_TO_CREATE_DIRECTORY'),$newPath));
+			}
+		}
+
+		// move
+		$this->__log(__METHOD__ . ' - moving '. $oldPath. ' to directory ' . $newPath);
+
+		if(!rename($oldPath,$newPath . $fileName)) {
+			if(is_dir($oldPath)) {
+				$this->error(sprintf($this->lang('ERROR_RENAMING_DIRECTORY'),$path,$this->get['new']));
+			} else {
+				$this->error(sprintf($this->lang('ERROR_RENAMING_FILE'),$path . $fileName,$this->get['new']));
+			}
+		}
+
+		$array = array(
+				'Error'=>"",
+				'Code'=>0,
+				'Old Path'=>$path,
+				'Old Name'=>$fileName,
+				'New Path'=>$newRelativePath,
+				'New Name'=>$fileName,
+		);
+		return $array;
+	}
+
 	public function delete() {
 
 		$current_path = $this->getFullPath();
@@ -304,7 +384,7 @@ class Filemanager {
 			$array = array(
 					'Error'=>"",
 					'Code'=>0,
-					'Path'=>$this->get['path']
+					'Path'=>$this->formatPath($this->get['path'])
 			);
 
 			$this->__log(__METHOD__ . ' - deleting folder '. $current_path);
@@ -315,7 +395,7 @@ class Filemanager {
 			$array = array(
 					'Error'=>"",
 					'Code'=>0,
-					'Path'=>$this->get['path']
+					'Path'=>$this->formatPath($this->get['path'])
 			);
 
 			$this->__log(__METHOD__ . ' - deleting file '. $current_path);
@@ -425,18 +505,28 @@ class Filemanager {
 		}
 	}
 
-	public function preview() {
+	public function preview($thumbnail) {
 			
 		$current_path = $this->getFullPath();
 			
 		if(isset($this->get['path']) && file_exists($current_path)) {
-			header("Content-type: image/" .$ext = pathinfo($current_path, PATHINFO_EXTENSION));
+			
+			// if $thumbnail is set to true we return the thumbnail
+			if($this->config['options']['generateThumbnails'] == true && $thumbnail == true) {
+				// get thumbnail (and create it if needed)
+				$returned_path = $this->get_thumbnail($current_path);
+			} else {
+				$returned_path = $current_path;
+			}
+			
+			header("Content-type: image/" .$ext = pathinfo($returned_path, PATHINFO_EXTENSION));
 			header("Content-Transfer-Encoding: Binary");
-			header("Content-length: ".filesize($current_path));
-			header('Content-Disposition: inline; filename="' . basename($current_path) . '"');
-			readfile($current_path);
-			$this->__log(__METHOD__ . ' - previewing '. $current_path);
+			header("Content-length: ".filesize($returned_path));
+			header('Content-Disposition: inline; filename="' . basename($returned_path) . '"');
+			readfile($returned_path);
+			
 			exit();
+			
 		} else {
 			$this->error(sprintf($this->lang('FILE_DOES_NOT_EXIST'),$current_path));
 		}
@@ -474,7 +564,7 @@ class Filemanager {
 	}
 
 
-	private function get_file_info($path='',$return=array()) {
+	private function get_file_info($path='', $thumbnail = false) {
 			
 		// DO NOT  rawurlencode() since $current_path it
 		// is used for displaying name file
@@ -504,6 +594,7 @@ class Filemanager {
 				$this->item['preview'] = $current_path;
 			} else {
 				$this->item['preview'] = 'connectors/php/filemanager.php?mode=preview&path='. rawurlencode($current_path);
+				if($thumbnail) $this->item['preview'] .= '&thumbnail=true';
 			}
 			//if(isset($get['getsize']) && $get['getsize']=='true') {
 			$this->item['properties']['Size'] = filesize($this->getFullPath($current_path));
@@ -537,10 +628,6 @@ private function getFullPath($path = '') {
 		if(isset($this->get['path'])) $path = $this->get['path'];
 	}
 	
-	// $this->__log(__METHOD_. " given path : " . $this->get['path']);
-	// $this->__log(__METHOD_. " doc_root value : " . $this->doc_root);
-	// $this->__log(__METHOD_. " dynamic_fileroot value : " . $this->dynamic_fileroot);
-	
 	if($this->config['options']['fileRoot'] !== false) {
 		$full_path = $this->doc_root . rawurldecode(str_replace ( $this->doc_root , '' , $path));
 		if($this->dynamic_fileroot != '') {
@@ -556,6 +643,25 @@ private function getFullPath($path = '') {
 		
 	return $full_path;
 		
+}
+
+/**
+ * format path regarding the initial configuration
+ * @param string $path
+ */
+private function formatPath($path) {
+	
+	if($this->dynamic_fileroot != '') {
+		
+		$a = explode($this->separator, $path);
+		return end($a);
+		
+	} else {
+		
+		return $path;
+		
+	}
+
 }
 
 private function sortFiles($array) {
@@ -690,11 +796,54 @@ private function cleanString($string, $allowed = array()) {
 	return $cleaned;
 }
 
-private function sanitize($var) {
+/**
+ * For debugging just call
+ * the direct URL http://localhost/Filemanager/connectors/php/filemanager.php?mode=preview&path=%2FFilemanager%2Fuserfiles%2FMy%20folder3%2Fblanches_neiges.jPg&thumbnail=true
+ * and echo vars below
+ * @param string $path
+ */
+private function get_thumbnail($path) {
+	
+	require_once('./inc/vendor/wideimage/lib/WideImage.php');
+	
+
+	// echo $path.'<br>';
+	$a = explode($this->separator, $path);
+	
+	$path_parts = pathinfo($path);
+	
+	// $thumbnail_path = $path_parts['dirname'].'/'.$this->cachefolder;
+	$thumbnail_path = $a[0].$this->separator.'/'.$this->cachefolder.dirname(end($a)).'/';
+	$thumbnail_name = $path_parts['filename'] . '_' . $this->thumbnail_width . 'x' . $this->thumbnail_height . 'px.' . $path_parts['extension'];
+	$thumbnail_fullpath = $thumbnail_path.$thumbnail_name;
+	
+	// echo $thumbnail_fullpath.'<br>';
+	
+	// if thumbnail does not exist we generate it
+	if(!file_exists($thumbnail_fullpath)) {
+		
+		// create folder if it does not exist
+		if(!file_exists($thumbnail_path)) {
+			mkdir($thumbnail_path, 0755, true);
+		}
+		$image = WideImage::load($path);
+		$resized = $image->resize($this->thumbnail_width, $this->thumbnail_height, 'outside')->crop('center', 'center', $this->thumbnail_width, $this->thumbnail_height);
+		$resized->saveToFile($thumbnail_fullpath);
+
+		$this->__log(__METHOD__ . ' - generating thumbnail :  '. $thumbnail_fullpath);
+		
+	}
+	
+	return $thumbnail_fullpath;
+}
+
+private function sanitize($var, $preserve = null) {
 	$sanitized = strip_tags($var);
 	$sanitized = str_replace('http://', '', $sanitized);
 	$sanitized = str_replace('https://', '', $sanitized);
-	$sanitized = str_replace('../', '', $sanitized);
+	if ($preserve != 'parent_dir') {
+		$sanitized = str_replace('../', '', $sanitized);
+	}
 	return $sanitized;
 }
 
@@ -771,6 +920,34 @@ public function disableLog() {
 	$this->logger = false;
 
 	$this->__log(__METHOD__ . ' - Log disabled');
+}
+
+/**
+ * Remove "../" from path
+ *
+ * @param string path to be converted
+ * @param bool if dir names should be cleaned
+ * @return string or false in case of error (as exception are not used here)
+ */
+public function expandPath($path, $clean = false)
+{
+	$todo  = explode('/', $path);
+	$fullPath = array();
+
+	foreach ($todo as $dir) {
+		if ($dir == '..') {
+			$element = array_pop($fullPath);
+			if (is_null($element)) {
+				return false;
+			}
+		} else {
+			if ($clean) {
+				$dir = $this->cleanString($dir);
+			}
+			array_push($fullPath, $dir);
+		}
+	}
+	return implode('/', $fullPath);
 }
 }
 ?>
