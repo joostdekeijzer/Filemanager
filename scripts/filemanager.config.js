@@ -9,6 +9,7 @@
         "browseOnly": false,
         "showConfirmation": true,
         "showThumbs": true,
+        "generateThumbnails": true,
         "searchBox": true,
         "listFiles": true,
         "fileSorting": "default",
@@ -18,6 +19,7 @@
         "fileRoot": "user_files/",
         "relPath": "/user_files/",
         "logger": false,
+        "capabilities": ["select", "download", "rename", "move", "delete"],
         "plugins": []
     },
     "security": {
