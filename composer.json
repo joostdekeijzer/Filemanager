@@ -16,6 +16,9 @@
          "role": "Developer"
       }
    ],
+   "autoload": {
+       "classmap": ["connectors/php/filemanager.class.php"]
+   },
    "require":{
       "php":">= 5.2.0"
    }
